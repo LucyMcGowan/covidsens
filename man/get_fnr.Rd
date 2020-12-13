@@ -4,16 +4,16 @@
 \alias{get_fnr}
 \title{Get test false negative rate x days from crossing the threshold of detection}
 \usage{
-get_fnr(time, shape = 2.32, rate = 0.23)
+get_fnr(time, shape = 2.33, rate = 0.24)
 }
 \arguments{
 \item{time}{Numeric. Number of days from crossing the threshold of detection}
 
 \item{shape}{Numeric. Shape of the gamma distribution used to estimate
-test sensitivity. Default is 2.32}
+test sensitivity. Default is 2.33}
 
 \item{rate}{Numeric. Rate of the gamma distribution used to estimate test
-sensitivity. Default is 0.23}
+sensitivity. Default is 0.24}
 }
 \description{
 Get test false negative rate x days from crossing the threshold of detection

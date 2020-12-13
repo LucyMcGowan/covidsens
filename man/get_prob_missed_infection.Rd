@@ -9,8 +9,8 @@ get_prob_missed_infection(
   test_time,
   additional_quarantine_time = 0,
   tolerance = 0.01,
-  shape_exposure_to_threshold = 2.08,
-  shape_threshold_to_symptoms = 2.05,
+  shape_exposure_to_threshold = 1.98,
+  shape_threshold_to_symptoms = 2.16,
   rate = 0.72
 )
 }
@@ -24,11 +24,11 @@ test sample is collected. Default is 0}
 
 \item{shape_exposure_to_threshold}{Numeric. Shape of the gamma distribution
 that describes the time from exposure to crossing the threshold of
-detection. Default is 2.08.}
+detection. Default is 1.98}
 
 \item{shape_threshold_to_symptoms}{Numeric. Shape of the gamma distribution
 that describes the time from crossing the threshold of
-detection to symptom onset. Default is 2.05.}
+detection to symptom onset. Default is 2.16}
 
 \item{rate}{Numeric. Rate of the gamma distributions that describe the time
 from exposure to crossing the threshold of detection and the time from
