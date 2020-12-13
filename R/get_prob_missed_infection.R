@@ -29,7 +29,7 @@ get_prob_missed_infection <- function(test_time,
                                       shape_exposure_to_threshold = 2.08,
                                       shape_threshold_to_symptoms = 2.05,
                                       rate = 0.72) {
-  integrate(top, 0, Inf, t = test_time, s = additional_quarantine_time,
+  stats::integrate(top, 0, Inf, t = test_time, s = additional_quarantine_time,
             shape_y = shape_threshold_to_symptoms,
             shape_x = shape_exposure_to_threshold,
             rate = rate,
@@ -42,9 +42,9 @@ top <- function(x, t, s, shape_y, shape_x, rate) {
 }
 
 G <- function(y, shape, rate) {
-  pgamma(y, shape, rate)
+  stats::pgamma(y, shape, rate)
 }
 
 f <- function(x, shape, rate) {
-  dgamma(x, shape, rate)
+  stats::dgamma(x, shape, rate)
 }

@@ -11,7 +11,8 @@
 #' @examples
 #' get_sensitivity(1)
 get_sensitivity <- function(time, shape = 2.32, rate = 0.23) {
-  dgamma(time, shape, rate) / dgamma((shape - 1) / rate, shape, rate) * 0.99
+  stats::dgamma(time, shape, rate) /
+    stats::dgamma((shape - 1) / rate, shape, rate) * 0.99
 }
 
 #' Get test false negative rate x days from crossing the threshold of detection
