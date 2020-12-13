@@ -69,7 +69,7 @@ ggplot(d, aes(x = qt, y = p)) +
   scale_x_continuous(breaks = 0:14, limits = c(0, 14)) +
   geom_hline(yintercept = c(0.089, 0.022), lty = 3) +
   theme_minimal() +
-  labs(x = "Time from exposure to quarantine exit",
+  labs(x = "Days from exposure to quarantine exit",
        y = "Proportion of infections missed")
 ```
 
@@ -81,7 +81,7 @@ with additional quarantine days.
 ``` r
 vals <- expand.grid(
   t = c(0, 3, 5, 7, 10),
-  s = 0:14
+  s = seq(0, 14, 0.1)
 )
 vals$p <- purrr::map2_dbl(vals$t, vals$s, get_prob_missed_infection)
 vals$qt <- vals$t + vals$s
@@ -94,7 +94,7 @@ ggplot(vals, aes(x = qt, y = p, color = as.factor(t))) +
   geom_hline(yintercept = c(0.089, 0.022), lty = 3) +
   geom_point(data = test_date, aes(x = t, y = p)) +
   theme_minimal() +
-  labs(x = "Time from exposure to quarantine exit",
+  labs(x = "Days from exposure to quarantine exit",
        y = "Proportion of infections missed",
        color = "Day test sample \nwas collected") +
   theme(panel.grid.minor = element_blank(),

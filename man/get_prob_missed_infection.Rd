@@ -8,7 +8,6 @@ strategy}
 get_prob_missed_infection(
   test_time,
   additional_quarantine_time = 0,
-  tolerance = 0.01,
   shape_exposure_to_threshold = 1.98,
   shape_threshold_to_symptoms = 2.16,
   rate = 0.72
@@ -19,8 +18,6 @@ get_prob_missed_infection(
 
 \item{additional_quarantine_time}{Numeric. Additional days quarantined after
 test sample is collected. Default is 0}
-
-\item{tolerance}{Numeric. Tolerance. Default is 0.01}
 
 \item{shape_exposure_to_threshold}{Numeric. Shape of the gamma distribution
 that describes the time from exposure to crossing the threshold of
