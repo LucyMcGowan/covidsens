@@ -34,11 +34,11 @@ get_prob_missed_infection <- function(test_time,
                                       shape_threshold_to_symptoms = 2.16,
                                       rate = 0.72) {
   stats::integrate(top, 0, Inf, t = test_time, s = additional_quarantine_time,
-            shape_a = shape_fnr,
-            rate_a = rate_fnr,
+                   shape_a = shape_fnr,
+                   rate_a = rate_fnr,
                    shape_y = shape_threshold_to_symptoms,
-            shape_x = shape_exposure_to_threshold,
-            rate = rate)$value
+                   shape_x = shape_exposure_to_threshold,
+                   rate = rate)$value
 }
 
 top <- function(x, t, s, shape_a, rate_a, shape_y, shape_x, rate) {
