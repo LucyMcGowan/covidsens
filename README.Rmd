@@ -38,13 +38,13 @@ devtools::install_github("LucyMcGowan/covidsens")
 ```
 
 
-## Example
+## Simple examples
 
 Plot the false negative rate by days since crossing the detection threshold.
 
 ```{r fig1}
 library(covidsens)
-library(ggplot2)
+library(tidyverse)
 
 d <- data.frame(
   x = seq(0, 14, by = 0.1),
@@ -104,24 +104,40 @@ ggplot(vals, aes(x = qt, y = p, color = as.factor(t))) +
         legend.position = "bottom") 
 ```
 
-Stochastic
+## Recreate Figures from Paper
 
-```{r, eval = FALSE}
-library(tidyverse)
+### Optimization
+
+```{r}
+
+```
+
+
+```{r}
+out_sum <- tibble(
+  shape_a_mean = 2.35,
+  shape_a_sd = 0.727, 
+  rate_a_mean = 0.244,
+  rate_a_sd = 0.0201,
+  shape_y_mean = 2.00,
+  shape_y_sd = 0.148,
+  shape_x_mean = 2.18,
+  shape_x_sd = 0.18,
+  rate_mean = 0.72,
+  rate_sd = 0.1
+)
+set.seed(1)
 n <- 100
 params <- tibble(
   id = 1:n,
-  shape_fnr = rnorm(n, 2.33, 1.86),
-  rate_fnr = rnorm(n, 0.24, 0.21),
-  shape_exposure_to_threshold = rnorm(n, 2.16, 1.25),
-  shape_threshold_to_symptoms = rnorm(n, 1.98, 1.33),
-  rate = rnorm(n, 0.72, 0.1)
-) %>%
-  mutate(shape_fnr = ifelse(shape_fnr < 1, 1, shape_fnr),
-         rate_fnr = ifelse(rate_fnr < 0.1, 0.1, rate_fnr),
-         shape_exposure_to_threshold = ifelse(shape_exposure_to_threshold < 0.1, 0.1, shape_exposure_to_threshold),
-         shape_threshold_to_symptoms = ifelse(shape_threshold_to_symptoms < 0.1, 0.1, shape_threshold_to_symptoms), 
-         rate = ifelse(rate < 0.1, 0.1, rate))
+  shape_fnr = rnorm(n, out_sum$shape_a_mean, out_sum$shape_a_sd),
+  rate_fnr = rnorm(n, out_sum$rate_a_mean, out_sum$rate_a_sd),
+  shape_threshold_to_symptoms = rnorm(n, out_sum$shape_y_mean, out_sum$shape_y_sd),
+  shape_exposure_to_threshold = rnorm(n, out_sum$shape_x_mean, out_sum$shape_x_sd),
+  rate = rnorm(n, out_sum$rate_mean, out_sum$rate_sd),
+  meanlog = rnorm(n, 1.63, 0.06122),
+  sdlog = rnorm(n, 0.50, 0.0255102)
+)
 vals <- expand_grid(
   test_time = c(0, 3, 5, 7, 10),
   additional_quarantine_time = 0:14,
@@ -130,29 +146,36 @@ vals <- expand_grid(
   left_join(params, by = "id") %>%
   select(-id)
 
-vals$p <- pmap_dbl(vals, get_prob_missed_infection)
+d <- vals %>%
+  mutate(p = pmap_dbl(vals[,1:7], possibly(get_prob_missed_infection, otherwise = NA)),
+         qt = test_time + additional_quarantine_time,
+         p_nothing = plnorm(qt, meanlog, sdlog, lower.tail = FALSE)) %>%
+  group_by(test_time, additional_quarantine_time, qt) 
 
-vals$qt <- vals$test_time + vals$additional_quarantine_time
-test_date <- vals[vals$additional_quarantine_time == 0, ]
-p <- vals %>%
-  group_by(test_time, qt) %>%
-  summarise(
-     med = median(p),
-    lcl = quantile(p, 0.025),
-    ucl = quantile(p, 0.975),
-    .groups = "drop_last"
-  )
-ggplot(p, aes(x = qt, y = med, color = as.factor(test_time), fill = as.factor(test_time))) +
+d %>%
+  summarise(m = median(p, na.rm = TRUE),
+            mean_ = mean(p, na.rm = TRUE),
+            lcl = quantile(p, 0.025, na.rm = TRUE),
+            ucl = quantile(p, 0.975, na.rm = TRUE),
+            m_nothing = median(p_nothing),
+            lcl_n = quantile(p_nothing, 0.025, na.rm = TRUE),
+            ucl_n = quantile(p_nothing, 0.975, na.rm = TRUE)) -> d_summ
+
+d %>%
+  ggplot(aes(x = qt, y = m, color = as.factor(test_time))) +
   geom_line() +
-  geom_ribbon(aes(ymin = lcl, ymax = ucl), alpha = 0.25, color = NA) +
-  geom_line(aes(x = qt, y = plnorm(qt, 1.63, 0.5, FALSE)), color = "black", lty = 2) +
+  geom_ribbon(aes(ymin = lcl, ymax = ucl, fill = as.factor(test_time)), alpha = 0.25, color = NA) +
+  geom_line(aes(x = qt, y = m_nothing), color = "black", lty = 2) +
+  geom_ribbon(aes(ymin = lcl_n, ymax = ucl_n), alpha = 0.25, color = NA) +
   scale_x_continuous(breaks = 0:14, limits = c(0, 14)) +
   geom_hline(yintercept = c(0.089, 0.022), lty = 3) +
- # geom_point(data = test_date, aes(x = test_time, y = p)) +
   theme_minimal() +
-  labs(x = "Days from exposure to quarantine exit",
+  labs(x = "Time from exposure to quarantine exit",
        y = "Proportion of infections missed",
        color = "Day test sample \nwas collected") +
+#  annotate("segment", x = 7, xend = 8, y = 0.23, yend = 0.23) +
+ # annotate("segment", x = 7, xend = 7, y = d[d$t == 5 & d$s == 2, "p", drop = TRUE], yend = plnorm(7, 1.63, 0.5, FALSE)) +
+ # annotate("text", label = "A test on day 5 + quarantine until day 7\n misses 20% of cases compared to 26% missed\n with a 7 day quarantine without a test", x = 11.25, y = 0.25) +
   theme(panel.grid.minor = element_blank(),
         legend.position = "bottom") 
 ```

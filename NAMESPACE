@@ -3,3 +3,4 @@
 export(get_fnr)
 export(get_prob_missed_infection)
 export(get_sensitivity)
+export(get_shenzhen_estimate)
