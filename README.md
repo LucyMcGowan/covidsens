@@ -212,7 +212,8 @@ incubation <- tibble(
   summarise(m = median(y),
             lcl = quantile(y, 0.025),
             ucl = quantile(y, 0.975),
-            .groups = "drop") %>%
+            .groups = "drop")
+incubation_plot <- incubation %>%
   ggplot(aes(x, m)) +
   geom_line(color = "orange") +
   geom_ribbon(aes(ymin = lcl, ymax = ucl), color = NA, alpha = 0.25, fill = "orange") +
@@ -230,10 +231,12 @@ shenzhen_sensitivity <- tibble(
   y = map_dbl(x, get_shenzhen_estimate)
 ) %>%
   group_by(x) %>%
-  summarise(m = median(y),
-            lcl = quantile(y, 0.025),
-            ucl = quantile(y, 0.975),
-            .groups = "drop") %>%
+  summarise(m = 1 - median(y),
+            lcl = 1 - quantile(y, 0.025),
+            ucl = 1 - quantile(y, 0.975),
+            .groups = "drop")
+shenzhen_sensitivity_p <- 
+  shenzhen_sensitivity %>%
   ggplot(aes(x, m)) +
   geom_line(color = "orange") +
   geom_ribbon(aes(ymin = lcl, ymax = ucl), color = NA, alpha = 0.25, fill = "orange") +
@@ -308,17 +311,36 @@ sensitivity <- params %>%
 ```
 
 ``` r
+params <-  tibble(
+  shape = rnorm(sims, out_sum$shape_a_mean, out_sum$shape_a_sd),
+  rate = rnorm(sims, out_sum$rate_a_mean, out_sum$rate_a_sd)
+)
+
+params <- expand_grid(
+  t = seq(0, 14, 0.1),
+  params
+)
+sens <- params %>%
+  mutate(y = pmap_dbl(params, get_sensitivity)) %>%
+  group_by(t) %>%
+  summarise(m = median(y),
+            lcl = quantile(y, 0.025),
+            ucl = quantile(y, 0.975))
+#> `summarise()` ungrouping output (override with `.groups` argument)
+```
+
+``` r
 sensitivity_summ <- sensitivity %>%
   group_by(t) %>%
-  summarise(m = median(sens),
-            lcl = quantile(sens, 0.025),
-            ucl = quantile(sens, 0.975),
+  summarise(m = 1 - median(sens),
+            lcl = 1 - quantile(sens, 0.025),
+            ucl = 1 - quantile(sens, 0.975),
             .groups = "drop")
-inferred_sensitivity <- sensitivity_summ %>%
+inferred_sensitivity <- sens %>%
   ggplot(aes(t, m)) +
   geom_line(color = "cornflower blue") +
   geom_ribbon(aes(ymin = lcl, ymax = ucl), alpha = 0.25, color = NA, fill = "cornflower blue") +
-  labs(x = "Time from symptom onset",
+  labs(x = "Time from threshold",
        y = "Sensitivity") +
   theme_minimal() +
   theme(panel.grid = element_blank(),
@@ -328,7 +350,7 @@ inferred_sensitivity <- sensitivity_summ %>%
 
 ``` r
 incubation_inferred <- tibble(
-   t = rep(seq(0, 14, 0.1), sims),
+  t = rep(seq(0, 14, 0.1), sims),
   y = dgamma(t, shape = rnorm(sims, out_sum$shape_y_mean, out_sum$shape_y_sd) + rnorm(sims, out_sum$shape_x_mean, out_sum$shape_x_sd), rate = rnorm(sims, out_sum$rate_mean, out_sum$rate_sd)),
 ) %>% 
   group_by(t) %>%
@@ -336,24 +358,22 @@ incubation_inferred <- tibble(
             lcl = quantile(y, 0.025),
             ucl = quantile(y, 0.975),
             .groups = "drop")
-overlay_1 <- incubation + 
-  geom_line(data = incubation_inferred, aes(t, m), color = "cornflower blue") +
-  geom_ribbon(data = incubation_inferred, aes(t, ymin = lcl, ymax = ucl), fill = "cornflower blue", color = NA, alpha = 0.25)
-```
-
-``` r
-overlay_2 <- shenzhen_sensitivity +
-  geom_line(data = sensitivity_summ, aes(t, m), color = "cornflower blue") +
-  geom_ribbon(data = sensitivity_summ, aes(t, ymin = lcl, ymax = ucl), fill = "cornflower blue", color = NA, alpha = 0.25)
 ```
 
 ``` r
 library(patchwork)
+incubation_plot <- incubation_plot +
+  geom_line(data = incubation_inferred, aes(t, m), color = "cornflower blue", lty = 2) 
 
-(incubation | shenzhen_sensitivity) / ((exposure_to_threshold + threshold_to_symtpoms) |  inferred_sensitivity) / (overlay_1 + overlay_2)
+shenzhen_sensitivity_p <- shenzhen_sensitivity_p +
+    geom_line(data = sensitivity_summ, aes(t, m), color = "cornflower blue", lty = 2)
+
+  (incubation_plot | shenzhen_sensitivity_p) / (exposure_to_threshold | threshold_to_symtpoms |  inferred_sensitivity)
 ```
 
 <img src="man/figures/README-fig-1-1.png" width="100%" />
+
+## change inferred sensitivity to a
 
 ### Figure 2
 
