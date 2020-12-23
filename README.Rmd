@@ -508,6 +508,47 @@ f2 + (f2_3 / f2_5 / f2_7 / f2_10) +
   plot_layout(widths = c(2, 1)) 
 ```
 
+## Compare to less sensitive test with quicker turn around
 
+```{r compare, cache = TRUE}
+sims <- 5000
+set.seed(1)
 
+params <- tibble(
+  id = 1:sims,
+  shape_fnr = rnorm(sims, out_sum$shape_a_mean, out_sum$shape_a_sd),
+  rate_fnr = rnorm(sims, out_sum$rate_a_mean, out_sum$rate_a_sd),
+  shape_threshold_to_symptoms = rnorm(sims, out_sum$shape_y_mean, out_sum$shape_y_sd),
+  shape_exposure_to_threshold = rnorm(sims, out_sum$shape_x_mean, out_sum$shape_x_sd),
+  rate = rnorm(sims, out_sum$rate_mean, out_sum$rate_sd)
+)
+vals <- expand_grid(
+  test_time = c(5, 7),
+  max_sensitivity = c(0.99, 0.95),
+  additional_quarantine_time = c(0, 2),
+  id = 1:sims
+) %>%
+  left_join(params, by = "id") %>%
+  select(-id)
+
+compare_sens <- vals %>%
+  mutate(p = pmap_dbl(vals, possibly(get_prob_missed_infection, otherwise = NA)),
+         qt = test_time + additional_quarantine_time)
+```
+
+```{r}
+compare_sens %>%
+  group_by(test_time, additional_quarantine_time, qt, max_sensitivity) %>%
+    summarise(m = median(p, na.rm = TRUE),
+            mean = mean(p, na.rm = TRUE),
+            lcl = quantile(p, 0.025, na.rm = TRUE),
+            ucl = quantile(p, 0.975, na.rm = TRUE),
+            .groups = "drop") -> compare_sens_summ
+compare_sens_summ
+```
+
+```{r}
+d_summ %>%
+  filter(test_time == 5, additional_quarantine_time == 2)
+```
 

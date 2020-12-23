@@ -518,3 +518,63 @@ f2 + (f2_3 / f2_5 / f2_7 / f2_10) +
 ```
 
 <img src="man/figures/README-fig2-1.png" width="100%" />
+
+## Compare to less sensitive test with quicker turn around
+
+``` r
+sims <- 5000
+set.seed(1)
+
+params <- tibble(
+  id = 1:sims,
+  shape_fnr = rnorm(sims, out_sum$shape_a_mean, out_sum$shape_a_sd),
+  rate_fnr = rnorm(sims, out_sum$rate_a_mean, out_sum$rate_a_sd),
+  shape_threshold_to_symptoms = rnorm(sims, out_sum$shape_y_mean, out_sum$shape_y_sd),
+  shape_exposure_to_threshold = rnorm(sims, out_sum$shape_x_mean, out_sum$shape_x_sd),
+  rate = rnorm(sims, out_sum$rate_mean, out_sum$rate_sd)
+)
+vals <- expand_grid(
+  test_time = c(5, 7),
+  max_sensitivity = c(0.99, 0.95),
+  additional_quarantine_time = c(0, 2),
+  id = 1:sims
+) %>%
+  left_join(params, by = "id") %>%
+  select(-id)
+
+compare_sens <- vals %>%
+  mutate(p = pmap_dbl(vals, possibly(get_prob_missed_infection, otherwise = NA)),
+         qt = test_time + additional_quarantine_time)
+```
+
+``` r
+compare_sens %>%
+  group_by(test_time, additional_quarantine_time, qt, max_sensitivity) %>%
+    summarise(m = median(p, na.rm = TRUE),
+            mean = mean(p, na.rm = TRUE),
+            lcl = quantile(p, 0.025, na.rm = TRUE),
+            ucl = quantile(p, 0.975, na.rm = TRUE),
+            .groups = "drop") -> compare_sens_summ
+compare_sens_summ
+#> # A tibble: 8 x 8
+#>   test_time additional_quarantine…    qt max_sensitivity     m  mean   lcl   ucl
+#>       <dbl>                  <dbl> <dbl>           <dbl> <dbl> <dbl> <dbl> <dbl>
+#> 1         5                      0     5            0.95    NA   NaN    NA    NA
+#> 2         5                      0     5            0.99    NA   NaN    NA    NA
+#> 3         5                      2     7            0.95    NA   NaN    NA    NA
+#> 4         5                      2     7            0.99    NA   NaN    NA    NA
+#> 5         7                      0     7            0.95    NA   NaN    NA    NA
+#> 6         7                      0     7            0.99    NA   NaN    NA    NA
+#> 7         7                      2     9            0.95    NA   NaN    NA    NA
+#> 8         7                      2     9            0.99    NA   NaN    NA    NA
+```
+
+``` r
+d_summ %>%
+  filter(test_time == 5, additional_quarantine_time == 2)
+#> # A tibble: 1 x 10
+#>   test_time additional_quar…    qt   m_p mean_p  lcl_p ucl_p m_no_test lcl_n
+#>       <dbl>            <int> <dbl> <dbl>  <dbl>  <dbl> <dbl>     <dbl> <dbl>
+#> 1         5                2     7 0.207  0.220 0.0890 0.417     0.264 0.187
+#> # … with 1 more variable: ucl_n <dbl>
+```
