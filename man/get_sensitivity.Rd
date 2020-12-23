@@ -4,7 +4,7 @@
 \alias{get_sensitivity}
 \title{Get test sensitivity x days from crossing the threshold of detection}
 \usage{
-get_sensitivity(time, shape = 2.33, rate = 0.24)
+get_sensitivity(time, shape = 2.33, rate = 0.24, max_sensitivity = 0.99)
 }
 \arguments{
 \item{time}{Numeric. Number of days from crossing the threshold of detection}
@@ -14,6 +14,9 @@ test sensitivity. Default is 2.33}
 
 \item{rate}{Numeric. Rate of the gamma distribution used to estimate test
 sensitivity. Default is 0.24}
+
+\item{max_sensitivity}{Numeric. Value between 0 and 1 indicating the maximum
+sensitivity. Default is 0.99.}
 }
 \description{
 Get test sensitivity x days from crossing the threshold of detection
