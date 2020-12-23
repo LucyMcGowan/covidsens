@@ -356,9 +356,10 @@ incubation_plot <- incubation_plot +
   geom_line(data = incubation_inferred, aes(t, m), color = "cornflower blue", lty = 2) 
 
 shenzhen_sensitivity_p <- shenzhen_sensitivity_p +
-    geom_line(data = sensitivity_summ, aes(t, m), color = "cornflower blue", lty = 2)
+  geom_line(data = sensitivity_summ, aes(t, m), color = "cornflower blue", lty = 2)
 
-  (incubation_plot | shenzhen_sensitivity_p) / (exposure_to_threshold | threshold_to_symtpoms |  inferred_sensitivity)
+(incubation_plot | shenzhen_sensitivity_p) / (exposure_to_threshold | threshold_to_symtpoms |  inferred_sensitivity) + 
+  plot_annotation(tag_levels = 'A')
 ```
 
 ## change inferred sensitivity to a
@@ -408,13 +409,16 @@ d %>%
 ```
 
 
-```{r fig2, message = FALSE, warning = FALSE}
+```{r f2, message = FALSE, warning = FALSE}
 d_summ %>%
+  filter(additional_quarantine_time == 0, test_time > 0) -> d_test_time
+f2 <- d_summ %>%
+  filter(test_time > 0) %>%
   ggplot(aes(x = qt, y = m_p, color = as.factor(test_time))) +
   geom_line() +
-  geom_ribbon(aes(ymin = lcl_p, ymax = ucl_p, fill = as.factor(test_time)), alpha = 0.25, color = NA) +
-  geom_line(aes(x = qt, y = m_no_test), color = "black", lty = 2) +
-  geom_ribbon(aes(ymin = lcl_n, ymax = ucl_n), alpha = 0.25, color = NA) +
+  geom_point(data = d_test_time) +
+  geom_line(data = d_summ, aes(x = qt, y = m_no_test), color = "black", lty = 2) +
+  #  geom_ribbon(data = d_summ, aes(ymin = lcl_n, ymax = ucl_n), alpha = 0.25, color = NA) +
   scale_x_continuous(breaks = 0:14, limits = c(0, 14)) +
   geom_hline(yintercept = c(0.089, 0.022), lty = 3) +
   theme_minimal() +
@@ -425,4 +429,85 @@ d_summ %>%
   theme(panel.grid.minor = element_blank(),
         legend.position = "bottom")
 ```
+
+```{r f2-3}
+f2_3 <- d_summ %>%
+  filter(test_time == 3) %>%
+  ggplot(aes(x = qt, y = m_p, color = as.factor(test_time))) +
+  geom_line() +
+  geom_point(data = d_test_time %>% filter(test_time == 3)) +
+  geom_ribbon(aes(ymin = lcl_p, ymax = ucl_p, fill = as.factor(test_time)), alpha = 0.25, color = NA) +
+  geom_line(aes(x = qt, y = m_no_test), color = "black", lty = 2) +
+  scale_x_continuous(breaks = 0:14, limits = c(0, 14)) +
+  theme_minimal() +
+  labs(x = "",
+       y = "",
+       color = "Day test sample \nwas collected",
+       fill = "Day test sample \nwas collected") +
+  theme(panel.grid.minor = element_blank(),
+        legend.position = "none")
+```
+
+```{r f2-5}
+f2_5 <- d_summ %>%
+  filter(test_time == 5) %>%
+  ggplot(aes(x = qt, y = m_p, color = as.factor(test_time))) +
+  geom_line(color = "#7CAE00") +
+  geom_point(data = d_test_time %>% filter(test_time == 5), color = "#7CAE00") +
+  geom_ribbon(aes(ymin = lcl_p, ymax = ucl_p, fill = as.factor(test_time)), fill = "#7CAE00", alpha = 0.25, color = NA) +
+  geom_line(aes(x = qt, y = m_no_test), color = "black", lty = 2) +
+  scale_x_continuous(breaks = 0:14, limits = c(0, 14)) +
+  theme_minimal() +
+  labs(x = "",
+       y = "",
+       color = "Day test sample \nwas collected",
+       fill = "Day test sample \nwas collected") +
+  theme(panel.grid.minor = element_blank(),
+        legend.position = "bottom")
+```
+
+
+```{r f2-7}
+f2_7 <- d_summ %>%
+  filter(test_time == 7) %>%
+  ggplot(aes(x = qt, y = m_p, color = as.factor(test_time))) +
+  geom_line(color = "#00BFC4") +
+  geom_point(data = d_test_time %>% filter(test_time == 7), color = "#00BFC4") +
+  geom_ribbon(aes(ymin = lcl_p, ymax = ucl_p, fill = as.factor(test_time)), fill = "#00BFC4", alpha = 0.25, color = NA) +
+  geom_line(aes(x = qt, y = m_no_test), color = "black", lty = 2) +
+  scale_x_continuous(breaks = 0:14, limits = c(0, 14)) +
+  theme_minimal() +
+  labs(x = "",
+       y = "",
+       color = "Day test sample \nwas collected",
+       fill = "Day test sample \nwas collected") +
+  theme(panel.grid.minor = element_blank(),
+        legend.position = "bottom")
+```
+
+```{r f2-10}
+f2_10 <- d_summ %>%
+  filter(test_time == 10) %>%
+  ggplot(aes(x = qt, y = m_p, color = as.factor(test_time))) +
+  geom_line(color = "#C77CFF") +
+  geom_point(data = d_test_time %>% filter(test_time == 10), color = "#C77CFF") +
+  geom_ribbon(aes(ymin = lcl_p, ymax = ucl_p, fill = as.factor(test_time)), fill = "#C77CFF", alpha = 0.25, color = NA) +
+  geom_line(aes(x = qt, y = m_no_test), color = "black", lty = 2) +
+  scale_x_continuous(breaks = 0:14, limits = c(0, 14)) +
+  theme_minimal() +
+  labs(x = "Time from exposure to quarantine exit",
+       y = "",
+       color = "Day test sample \nwas collected",
+       fill = "Day test sample \nwas collected") +
+  theme(panel.grid.minor = element_blank(),
+        legend.position = "bottom")
+```
+
+```{r fig2, message = FALSE, warning = FALSE, fig.width = 10}
+f2 + (f2_3 / f2_5 / f2_7 / f2_10) +
+  plot_layout(widths = c(2, 1)) 
+```
+
+
+
 
