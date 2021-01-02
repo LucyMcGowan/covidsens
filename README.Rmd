@@ -108,10 +108,15 @@ ggplot(vals, aes(x = qt, y = p, color = as.factor(t))) +
 
 ### Optimization
 
+```{r, message = FALSE, warning = FALSE}
+library(tidyverse)
+library(dfoptim)
+```
+
 ```{r opt_fx}
 estimate_shenzhen <- function(k, t, shape_y, shape_a, rate_a, rate) {
   dgamma(k, shape_y, rate) * 
-    get_fnr(time = k + t, shape = shape_a, rate = rate_a) * 0.99 
+    get_fnr(time = k + t, shape = shape_a, rate = rate_a)
 }
 
 diff_shenzhen <- function(t, shape_a, rate_a, shape_y, rate) {
@@ -126,18 +131,18 @@ er <- function(x, shape, rate) {
   shape_y <- x[3]
   shape_x <- x[4]
   sum(map_dbl(seq(-8, 7, 1), diff_shenzhen, shape_a = shape_a, 
-              rate_a = rate_a, shape_y = shape_y, rate = rate)^2) + 
-    ((shape_y + shape_x) - shape)^2 
+              rate_a = rate_a, shape_y = shape_y, rate = rate)^2) +
+    ((shape_y + shape_x) - shape)^2
 }
 
 run_optimization <- function() {
   fit_incubation <- fitdistrplus::fitdist(
     rlnorm(10000, rnorm(1, 1.63, 0.06122), rnorm(1, 0.5, 0.0255102)), "gamma")
   
-  o <- optim(c(2.33, 0.24, 1.98, 2.16), er,
-             lower = c(1, 0.1, 0.1, 0.1), method = "L-BFGS-B",
-             shape = fit_incubation$estimate[1],
-             rate = fit_incubation$estimate[2])
+  o <- nmkb(c(2.3, 0.2, 0.5, 0.5), er,
+            lower = c(1, 0.1, 0.1, 0.1), 
+            rate = fit_incubation$estimate[2], 
+            shape = fit_incubation$estimate[1]) 
   
   data.frame(
     shape_a = o$par[1],
@@ -152,8 +157,6 @@ run_optimization <- function() {
 ```
 
 ```{r possible}
-library(tidyverse)
-
 run_optimization <- possibly(run_optimization,
                              otherwise = data.frame(
                                shape_a = NA,
@@ -173,13 +176,12 @@ set.seed(1)
 out <- map_df(1:sims, ~run_optimization())
 ```
 
-```{r, eval = FALSE, echo = FALSE}
+```{r, echo = FALSE}
 save(out, file = "data-raw/param-est.Rda")
 ```
 
 ```{r summarize}
 out %>%
-  na.exclude %>% ## remove one value that was missing
   summarise(shape_a_mean = mean(shape_a),
             shape_a_sd = sd(shape_a),
             rate_a_mean = mean(rate_a),
@@ -212,7 +214,7 @@ incubation_plot <- incubation %>%
   geom_line(color = "orange") +
   geom_ribbon(aes(ymin = lcl, ymax = ucl), color = NA, alpha = 0.25, fill = "orange") +
   labs(x = "Time from infection to symptom onset",
-       y = "Proportion of infections") + 
+       y = "Density") + 
   theme_minimal() +
   theme(panel.grid = element_blank(),
         axis.line = element_line(),
@@ -245,7 +247,7 @@ shenzhen_sensitivity_p <-
 ```{r detect}
 exposure_to_threshold <- tibble(
   x = rep(seq(0, 14, 0.1), sims),
-  y = dgamma(x, shape = rnorm(sims, out_sum$shape_x_mean, out_sum$shape_x_sd), rate = rnorm(sims, out_sum$rate_mean, out_sum$rate_sd))
+  y = dgamma(x, shape = out$shape_x, rate = out$rate_sym)
 ) %>%
   group_by(x) %>%
   summarise(m = median(y),
@@ -255,8 +257,9 @@ exposure_to_threshold <- tibble(
   ggplot(aes(x, m)) +
   geom_line(color = "cornflower blue") +
   geom_ribbon(aes(ymin = lcl, ymax = ucl), alpha = 0.25, color = NA, fill = "cornflower blue") +
+  coord_cartesian(ylim = c(0, 1)) +
   labs(x = "Infection to threshold",
-       y = "Proportion of infections") +
+       y = "Density") +
   theme_minimal() +
   theme(panel.grid = element_blank(),
         axis.line = element_line(),
@@ -266,7 +269,7 @@ exposure_to_threshold <- tibble(
 ```{r thresh-sym}
 threshold_to_symtpoms <- tibble(
   x = rep(seq(0, 14, 0.1), sims),
-  y = dgamma(x, shape = rnorm(sims, out_sum$shape_y_mean, out_sum$shape_y_sd), rate = rnorm(sims, out_sum$rate_mean, out_sum$rate_sd))
+  y = dgamma(x, shape = out$shape_y, rate = out$rate_sym)
 ) %>%
   group_by(x) %>%
   summarise(m = median(y),
@@ -276,8 +279,9 @@ threshold_to_symtpoms <- tibble(
   ggplot(aes(x, m)) +
   geom_line(color = "cornflower blue") +
   geom_ribbon(aes(ymin = lcl, ymax = ucl), alpha = 0.25, color = NA, fill = "cornflower blue") +
+  coord_cartesian(ylim = c(0, 1)) +
   labs(x = "Threshold to symptom onset",
-       y = "Proportion of infections") +
+       y = "Density") +
   theme_minimal() +
   theme(panel.grid = element_blank(),
         axis.line = element_line(),
@@ -291,10 +295,10 @@ get_sensitivity_sym <- function(t, shape_a, rate_a, shape_y, rate) {
 }
 
 params <- tibble(
-  shape_a = rnorm(sims, out_sum$shape_a_mean, out_sum$shape_a_sd),
-  rate_a = rnorm(sims, out_sum$rate_a_mean, out_sum$rate_a_sd),
-  shape_y = rnorm(sims, out_sum$shape_y_mean, out_sum$shape_y_sd),
-  rate = rnorm(sims, out_sum$rate_mean, out_sum$rate_sd)
+  shape_a = out$shape_a,
+  rate_a = out$rate_a,
+  shape_y = out$shape_y,
+  rate = out$rate_sym
 )
 params <- expand_grid(
   t = seq(-8, 7, 0.1),
@@ -305,9 +309,9 @@ sensitivity <- params %>%
 ```
 
 ```{r a, cache = TRUE}
-params <-  tibble(
-  shape = rnorm(sims, out_sum$shape_a_mean, out_sum$shape_a_sd),
-  rate = rnorm(sims, out_sum$rate_a_mean, out_sum$rate_a_sd)
+params <- tibble(
+  shape = out$shape_a,
+  rate = out$rate_a
 )
 
 params <- expand_grid(
@@ -319,7 +323,8 @@ sens <- params %>%
   group_by(t) %>%
   summarise(m = median(y),
             lcl = quantile(y, 0.025),
-            ucl = quantile(y, 0.975))
+            ucl = quantile(y, 0.975),
+            .groups = "drop")
 ```
 
 
@@ -345,7 +350,7 @@ inferred_sensitivity <- sens %>%
 ```{r overlay-1}
 incubation_inferred <- tibble(
   t = rep(seq(0, 14, 0.1), sims),
-  y = dgamma(t, shape = rnorm(sims, out_sum$shape_y_mean, out_sum$shape_y_sd) + rnorm(sims, out_sum$shape_x_mean, out_sum$shape_x_sd), rate = rnorm(sims, out_sum$rate_mean, out_sum$rate_sd)),
+  y = dgamma(t, shape = out$shape_x + out$shape_y, rate = out$rate_sym),
 ) %>% 
   group_by(t) %>%
   summarise(m = median(y),
@@ -365,12 +370,15 @@ shenzhen_sensitivity_p <- shenzhen_sensitivity_p +
 
 (incubation_plot | shenzhen_sensitivity_p) / (exposure_to_threshold | threshold_to_symtpoms |  inferred_sensitivity) + 
   plot_annotation(tag_levels = 'A')
+```
 
-ggsave("fig1-a.pdf", plot = incubation_plot, width = 15, height = 10)
-ggsave("fig1-b.pdf", plot = shenzhen_sensitivity_p, width = 15, height = 10)
-ggsave("fig1-c.pdf", plot = exposure_to_threshold, width = 15, height = 10)
-ggsave("fig1-d.pdf", plot = threshold_to_symtpoms, width = 15, height = 10)
-ggsave("fig1-e.pdf", plot = inferred_sensitivity, width = 15, height = 10)
+
+```{r, echo = FALSE}
+ggsave("man/figures/fig1-a.pdf", plot = incubation_plot, width = 7.5, height = 5)
+ggsave("man/figures/fig1-b.pdf", plot = shenzhen_sensitivity_p, width = 7.5, height = 5)
+ggsave("man/figures/fig1-c.pdf", plot = exposure_to_threshold, width = 7.5, height = 5)
+ggsave("man/figures/fig1-d.pdf", plot = threshold_to_symtpoms, width = 7.5, height = 5)
+ggsave("man/figures/fig1-e.pdf", plot = inferred_sensitivity, width = 7.5, height = 5)
 
 ```
 
@@ -378,24 +386,23 @@ ggsave("fig1-e.pdf", plot = inferred_sensitivity, width = 15, height = 10)
 ### Figure 2
 
 ```{r stochastic-prob-missed, cache = TRUE}
-sims <- 5000
+sims <- nrow(out)
 set.seed(1)
 
 params <- tibble(
   id = 1:sims,
-  shape_fnr = rnorm(sims, out_sum$shape_a_mean, out_sum$shape_a_sd),
-  rate_fnr = rnorm(sims, out_sum$rate_a_mean, out_sum$rate_a_sd),
-  shape_threshold_to_symptoms = rnorm(sims, out_sum$shape_y_mean, out_sum$shape_y_sd),
-  shape_exposure_to_threshold = rnorm(sims, out_sum$shape_x_mean, out_sum$shape_x_sd),
-  rate = rnorm(sims, out_sum$rate_mean, out_sum$rate_sd)
+  shape_fnr = out$shape_a,
+  rate_fnr = out$rate_a,
+  shape_exposure_to_threshold = out$shape_x,
+  shape_threshold_to_symptoms = out$shape_y,
+  rate = out$rate_sym
 )
 vals <- expand_grid(
   test_time = c(3, 5, 7, 10),
   additional_quarantine_time = 0:14,
-  max_sensitivity = c(0.99, 0.90),
   id = 1:sims
 ) %>%
-  filter(test_time + additional_quarantine_time < 14) %>%
+  filter(test_time + additional_quarantine_time <= 14) %>%
   left_join(params, by = "id") %>%
   select(-id)
 
@@ -410,7 +417,6 @@ save(d, file = "data-raw/prop-missed.Rda")
 
 ```{r stoch}
 d %>%
-  filter(max_sensitivity == 0.99) %>%
   group_by(test_time, additional_quarantine_time, qt) %>%
   summarise(m_p = median(p, na.rm = TRUE),
             mean_p = mean(p, na.rm = TRUE),
@@ -432,10 +438,11 @@ f2 <- d_summ %>%
                          y = plnorm(seq(0, 14, 0.1), 1.63, 0.5, lower.tail = FALSE)),
             aes(x = x, y = y), color = "black", lty = 2) +
   scale_x_continuous(breaks = 0:14, limits = c(0, 14)) +
+  scale_y_continuous(labels = scales::percent) +
   geom_hline(yintercept = c(0.089, 0.022), lty = 3) +
   theme_minimal() +
   labs(x = "Time from infection to quarantine exit",
-       y = "Proportion of infections missed",
+       y = "Percent of infections missed",
        color = "Day test sample \nwas collected",
        fill = "Day test sample \nwas collected",
        title = "A") +
@@ -458,6 +465,7 @@ f2_3 <- d_summ %>%
   geom_line(data = data.frame(x = 3:14, y = plnorm(3:14, 1.63, 0.5, lower.tail = FALSE)), 
             aes(x = x, y = y), color = "black", lty = 2) +
   scale_x_continuous(breaks = 0:14, limits = c(0, 14)) +
+  scale_y_continuous(labels = scales::percent) +
   geom_hline(yintercept = c(0.089, 0.022), lty = 3) +
   theme_minimal() +
   labs(x = "",
@@ -475,7 +483,9 @@ f2_5 <- d_summ %>%
   geom_point(data = d_test_time %>% filter(test_time == 5), color = "#7CAE00") +
   geom_ribbon(aes(ymin = lcl_p, ymax = ucl_p, fill = as.factor(test_time)), fill = "#7CAE00", alpha = 0.25, color = NA) +
   geom_line(data = data.frame(x = 5:14, y = plnorm(5:14, 1.63, 0.5, lower.tail = FALSE)), 
-            aes(x = x, y = y), color = "black", lty = 2) +  scale_x_continuous(breaks = 0:14, limits = c(0, 14)) +
+            aes(x = x, y = y), color = "black", lty = 2) +
+  scale_x_continuous(breaks = 0:14, limits = c(0, 14)) +
+  scale_y_continuous(labels = scales::percent, breaks = c(0, 0.25, 0.5)) +
   geom_hline(yintercept = c(0.089, 0.022), lty = 3) +
   theme_minimal() +
   labs(x = "",
@@ -494,7 +504,9 @@ f2_7 <- d_summ %>%
   geom_point(data = d_test_time %>% filter(test_time == 7), color = "#00BFC4") +
   geom_ribbon(aes(ymin = lcl_p, ymax = ucl_p, fill = as.factor(test_time)), fill = "#00BFC4", alpha = 0.25, color = NA) +
   geom_line(data = data.frame(x = 7:14, y = plnorm(7:14, 1.63, 0.5, lower.tail = FALSE)), 
-            aes(x = x, y = y), color = "black", lty = 2) +  scale_x_continuous(breaks = 0:14, limits = c(0, 14)) +
+            aes(x = x, y = y), color = "black", lty = 2) +  
+  scale_x_continuous(breaks = 0:14, limits = c(0, 14)) +
+  scale_y_continuous(labels = scales::percent) +
   geom_hline(yintercept = c(0.089, 0.022), lty = 3) +
   theme_minimal() +
   labs(x = "",
@@ -514,6 +526,7 @@ f2_10 <- d_summ %>%
   geom_line(data = data.frame(x = 10:14, y = plnorm(10:14, 1.63, 0.5, lower.tail = FALSE)), 
             aes(x = x, y = y), color = "black", lty = 2) +  
   scale_x_continuous(breaks = 0:14, limits = c(0, 14)) +
+  scale_y_continuous(labels = scales::percent) +
   geom_hline(yintercept = c(0.089, 0.022), lty = 3) +
   theme_minimal() +
   labs(x = "Time from infection to quarantine exit",
@@ -553,6 +566,10 @@ compare_sens_summ %>%
   filter(additional_quarantine_time %in% c(0, 2))
 ```
 
+```{r, echo = FALSE}
+save(compare_sens, file = "data-raw/compare-sens.Rda")
+```
+
 ```{r}
 f3 <- compare_sens_summ %>%
   filter((additional_quarantine_time == 2 & max_sensitivity == 0.99) | (additional_quarantine_time == 0 & max_sensitivity %in% c(0.5, 0.75, 0.90))) %>%
@@ -564,6 +581,7 @@ f3 <- compare_sens_summ %>%
                  y = plnorm(seq(0, 14, 0.1), 1.63, 0.5, lower.tail = FALSE)),
     aes(x = x, y = y), color = "black", lty = 2) +
   scale_x_continuous(breaks = 0:14, limits = c(0, 14)) +
+  scale_y_continuous(labels = scales::percent) +
   geom_hline(yintercept = c(0.089, 0.022), lty = 3) +
   theme_minimal() +
   scale_color_manual("", values = c("dark blue", "cornflower blue", "light blue", "orange"),
@@ -573,7 +591,7 @@ f3 <- compare_sens_summ %>%
                        "Test sample collected on day of exit, max test sensitivity: 90%",
                        "Test sample collected 48 hours prior to exit, max test sensitivity: 99%")) +
   labs(x = "Time from infection to quarantine exit",
-       y = "Proportion of infections missed",
+       y = "Percent of infections missed",
        title = "B") +
   theme(panel.grid.minor = element_blank(),
         legend.position = "bottom",
@@ -585,12 +603,17 @@ f3 <- compare_sens_summ %>%
 ```
 
 ```{r fig2, message = FALSE, warning = FALSE, fig.height = 12, fig.width = 10}
-(f2 + inset_element(f2_3, left = 0.6, bottom = 0.78, right = 1, top = 1) +
-   inset_element(f2_5, left = 0.6, bottom = 0.56, right = 1, top = 0.78) +
-   inset_element(f2_7, left = 0.6, bottom = 0.34, right = 1, top = 0.56) +
-   inset_element(f2_10, left = 0.6, bottom = 0.12, right = 1, top = 0.34)) / 
+(f2 + inset_element(f2_3, left = 0.6, bottom = 0.75, right = 1, top = 1) +
+   inset_element(f2_5, left = 0.6, bottom = 0.55, right = 1, top = 0.8) +
+   inset_element(f2_7, left = 0.6, bottom = 0.35, right = 1, top = 0.6) +
+   inset_element(f2_10, left = 0.6, bottom = 0.15, right = 1, top = 0.4)) / 
   f3 + plot_layout(heights = c(2, 1.75))
-
 ```
+
+```{r}
+ggsave("man/figures/fig2.pdf", height = 12, width = 10)
+ggsave("man/figures/fig2.png", height = 12, width = 10)
+```
+
 
 
