@@ -74,7 +74,7 @@ set.seed(1)
 out <- map_df(1:sims, ~run_optimization())
 ```
 
-```{r, echo = FALSE}
+```{r, echo = FALSE, eval = FALSE}
 save(out, file = "data-raw/param-est.Rda")
 ```
 
@@ -271,7 +271,7 @@ shenzhen_sensitivity_p <- shenzhen_sensitivity_p +
 ```
 
 
-```{r, echo = FALSE}
+```{r, echo = FALSE, eval = FALSE}
 ggsave("man/figures/fig1-a.pdf", plot = incubation_plot, width = 7.5, height = 5)
 ggsave("man/figures/fig1-b.pdf", plot = shenzhen_sensitivity_p, width = 7.5, height = 5)
 ggsave("man/figures/fig1-c.pdf", plot = exposure_to_threshold, width = 7.5, height = 5)
@@ -309,7 +309,7 @@ d <- vals %>%
          qt = test_time + additional_quarantine_time) 
 ```
 
-```{r, echo = FALSE}
+```{r, echo = FALSE, eval = FALSE}
 save(d, file = "data-raw/prop-missed.Rda")
 ```
 
@@ -464,7 +464,7 @@ compare_sens_summ %>%
   filter(additional_quarantine_time %in% c(0, 2))
 ```
 
-```{r, echo = FALSE}
+```{r, echo = FALSE, eval = FALSE}
 save(compare_sens, file = "data-raw/compare-sens.Rda")
 ```
 
@@ -508,7 +508,7 @@ f3 <- compare_sens_summ %>%
   f3 + plot_layout(heights = c(2, 1.75))
 ```
 
-```{r, echo = FALSE, message = FALSE, warning = FALSE}
+```{r, echo = FALSE, eval = FALSE, message = FALSE, warning = FALSE}
 ggsave("man/figures/fig2.pdf", height = 12, width = 10)
 ggsave("man/figures/fig2.png", height = 12, width = 10)
 ```
