@@ -83,26 +83,33 @@
 
     
     
-<div id="optimization" class="section level3">
-<h3 class="hasAnchor">
-<a href="#optimization" class="anchor"></a>Optimization</h3>
+<div id="load-packages" class="section level2">
+<h2 class="hasAnchor">
+<a href="#load-packages" class="anchor"></a>Load packages</h2>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="http://tidyverse.tidyverse.org">tidyverse</a></span><span class="op">)</span>
 <span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://coah.jhu.edu/people/Faculty_personal_Pages/Varadhan.html">dfoptim</a></span><span class="op">)</span>
 <span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va">covidsens</span><span class="op">)</span></code></pre></div>
+</div>
+<div id="optimization" class="section level2">
+<h2 class="hasAnchor">
+<a href="#optimization" class="anchor"></a>Optimization</h2>
+<p>The <code>estimate_shenzhen</code> function estimates the sensitivity at a given time from crossing a critical viral load threshold, <code>k</code>, and time from symptom onset, <code>t</code>. It will be used to approximate the Shenzhen test sensitivity data.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">estimate_shenzhen</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">k</span>, <span class="va">t</span>, <span class="va">shape_y</span>, <span class="va">shape_a</span>, <span class="va">rate_a</span>, <span class="va">rate</span><span class="op">)</span> <span class="op">{</span>
   <span class="fu"><a href="https://rdrr.io/r/stats/GammaDist.html">dgamma</a></span><span class="op">(</span><span class="va">k</span>, <span class="va">shape_y</span>, <span class="va">rate</span><span class="op">)</span> <span class="op">*</span> 
     <span class="fu"><a href="../../reference/get_fnr.html">get_fnr</a></span><span class="op">(</span>time <span class="op">=</span> <span class="va">k</span> <span class="op">+</span> <span class="va">t</span>, shape <span class="op">=</span> <span class="va">shape_a</span>, rate <span class="op">=</span> <span class="va">rate_a</span><span class="op">)</span>
-<span class="op">}</span>
-
-<span class="va">diff_shenzhen</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">t</span>, <span class="va">shape_a</span>, <span class="va">rate_a</span>, <span class="va">shape_y</span>, <span class="va">rate</span><span class="op">)</span> <span class="op">{</span>
+<span class="op">}</span></code></pre></div>
+<p>The <code>diff_shenzhen</code> function integrates over <code>estimate_shenzhen</code> from 0 to <span class="math inline">\(\infty\)</span> with respect to <code>k</code>, the time from crossing the critical viral threshold for a given time from symptom onset, <code>t</code>. It then subtracts this estimate from the test sensitivity indexed at symptom onset reported by the Shenzhen model.</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span class="va">diff_shenzhen</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">t</span>, <span class="va">shape_a</span>, <span class="va">rate_a</span>, <span class="va">shape_y</span>, <span class="va">rate</span><span class="op">)</span> <span class="op">{</span>
   <span class="fu"><a href="https://rdrr.io/r/stats/integrate.html">integrate</a></span><span class="op">(</span><span class="va">estimate_shenzhen</span>, <span class="fl">0</span>, <span class="cn">Inf</span>, t <span class="op">=</span> <span class="va">t</span>, shape_a <span class="op">=</span> <span class="va">shape_a</span>,
             rate_a <span class="op">=</span> <span class="va">rate_a</span>, shape_y <span class="op">=</span> <span class="va">shape_y</span>, rate <span class="op">=</span> <span class="va">rate</span><span class="op">)</span><span class="op">$</span><span class="va">value</span> <span class="op">-</span> 
     <span class="fu"><a href="../../reference/get_shenzhen_estimate.html">get_shenzhen_estimate</a></span><span class="op">(</span><span class="va">t</span><span class="op">)</span> 
-<span class="op">}</span>
-
-<span class="va">er</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span>, <span class="va">shape</span>, <span class="va">rate</span><span class="op">)</span> <span class="op">{</span>
+<span class="op">}</span></code></pre></div>
+<p>The <code>er</code> function is the function that is minimized by the optimization function. It includes the squared difference between the model sensitivity estimates and the Shenzhen estimates from 8 days prior to symptom onset through 7 days post-symptom onset, as well as the squared difference between the estimated shape of the infectiousness gamma distribution and the shape derived from the empirical data put forth by the MacAloon meta analysis. This function is attempting to simultaneously find optimal estimates for the shape and rate of a gamma distribution used to estimate the test sensitivity indexed on time of crossing the critical viral threshold (<code>shape_a</code> and <code>rate_a</code>), as well as the shape of the distribution of time from infection to crossing the critical viral threshold (<code>shape_x</code>) and the shape of the distribution of time from crossing the critical viral threshold to symptom onset (<code>shape_y</code>).</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span class="va">er</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span>, <span class="va">shape</span>, <span class="va">rate</span><span class="op">)</span> <span class="op">{</span>
   <span class="va">shape_a</span> <span class="op">&lt;-</span> <span class="va">x</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span>
   <span class="va">rate_a</span> <span class="op">&lt;-</span> <span class="va">x</span><span class="op">[</span><span class="fl">2</span><span class="op">]</span>
   <span class="va">shape_y</span> <span class="op">&lt;-</span> <span class="va">x</span><span class="op">[</span><span class="fl">3</span><span class="op">]</span>
@@ -110,9 +117,10 @@
   <span class="fu"><a href="https://rdrr.io/r/base/sum.html">sum</a></span><span class="op">(</span><span class="fu">map_dbl</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html">seq</a></span><span class="op">(</span><span class="op">-</span><span class="fl">8</span>, <span class="fl">7</span>, <span class="fl">1</span><span class="op">)</span>, <span class="va">diff_shenzhen</span>, shape_a <span class="op">=</span> <span class="va">shape_a</span>, 
               rate_a <span class="op">=</span> <span class="va">rate_a</span>, shape_y <span class="op">=</span> <span class="va">shape_y</span>, rate <span class="op">=</span> <span class="va">rate</span><span class="op">)</span><span class="op">^</span><span class="fl">2</span><span class="op">)</span> <span class="op">+</span>
     <span class="op">(</span><span class="op">(</span><span class="va">shape_y</span> <span class="op">+</span> <span class="va">shape_x</span><span class="op">)</span> <span class="op">-</span> <span class="va">shape</span><span class="op">)</span><span class="op">^</span><span class="fl">2</span>
-<span class="op">}</span>
-
-<span class="va">run_optimization</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="op">{</span>
+<span class="op">}</span></code></pre></div>
+<p>The <code>run_optimization</code> function first finds a gamma distribution that best fits the log normal distribution proposed by McAloon et al. It then uses the shape and rate of this distribution in the optimization function, minimizing the <code>er</code> function described above. The <code>nmkb</code> function is an implementation of the Nelder-Mead algorithm for derivative-free optimization that allows bounds to be placed on parameters. Finally, a data frame with results is output.</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span class="va">run_optimization</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="op">{</span>
   <span class="va">fit_incubation</span> <span class="op">&lt;-</span> <span class="fu">fitdistrplus</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/fitdistrplus/man/fitdist.html">fitdist</a></span><span class="op">(</span>
     <span class="fu"><a href="https://rdrr.io/r/stats/Lognormal.html">rlnorm</a></span><span class="op">(</span><span class="fl">10000</span>, <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html">rnorm</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1.63</span>, <span class="fl">0.06122</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html">rnorm</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">0.5</span>, <span class="fl">0.0255102</span><span class="op">)</span><span class="op">)</span>, <span class="st">"gamma"</span><span class="op">)</span>
   
@@ -131,7 +139,7 @@
     error <span class="op">=</span> <span class="va">o</span><span class="op">$</span><span class="va">value</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span>
   <span class="op">)</span>
 <span class="op">}</span></code></pre></div>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">run_optimization</span> <span class="op">&lt;-</span> <span class="fu">possibly</span><span class="op">(</span><span class="va">run_optimization</span>,
                              otherwise <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html">data.frame</a></span><span class="op">(</span>
                                shape_a <span class="op">=</span> <span class="cn">NA</span>,
@@ -142,12 +150,13 @@
                                rate_sym <span class="op">=</span> <span class="cn">NA</span>,
                                error <span class="op">=</span> <span class="cn">NA</span>
                              <span class="op">)</span><span class="op">)</span></code></pre></div>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<p>The code below runs the <code>run_optimization</code> function 5,000 times, saving the output to a large data frame called <code>out</code>.</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">sims</span> <span class="op">&lt;-</span> <span class="fl">5000</span>
 
 <span class="fu"><a href="https://rdrr.io/r/base/Random.html">set.seed</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span>
 <span class="va">out</span> <span class="op">&lt;-</span> <span class="fu">map_df</span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="va">sims</span>, <span class="op">~</span><span class="fu">run_optimization</span><span class="op">(</span><span class="op">)</span><span class="op">)</span></code></pre></div>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">out</span> <span class="op">%&gt;%</span>
   <span class="fu">summarise</span><span class="op">(</span>shape_a_mean <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html">mean</a></span><span class="op">(</span><span class="va">shape_a</span><span class="op">)</span>,
             shape_a_sd <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/sd.html">sd</a></span><span class="op">(</span><span class="va">shape_a</span><span class="op">)</span>,
@@ -203,11 +212,11 @@
 <td align="right">4.189122</td>
 </tr></tbody>
 </table>
-</div>
-<div id="figure-1" class="section level3">
+<div id="figure-s1" class="section level3">
 <h3 class="hasAnchor">
-<a href="#figure-1" class="anchor"></a>Figure 1</h3>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<a href="#figure-s1" class="anchor"></a>Figure S1</h3>
+<p>The code below takes the incubation distribution results from McAloon et al. and plots them to compare our model estimates of the incubation period to.</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">incubation</span> <span class="op">&lt;-</span> <span class="fu">tibble</span><span class="op">(</span>
   x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html">rep</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html">seq</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">14</span>, by <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span>, <span class="va">sims</span><span class="op">)</span>,
   y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Lognormal.html">dlnorm</a></span><span class="op">(</span><span class="va">x</span>, <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html">rnorm</a></span><span class="op">(</span><span class="va">sims</span>, <span class="fl">1.63</span>, <span class="fl">0.06122</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html">rnorm</a></span><span class="op">(</span><span class="va">sims</span>, <span class="fl">0.50</span>, <span class="fl">0.0255102</span><span class="op">)</span><span class="op">)</span>
@@ -227,7 +236,8 @@
   <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html">theme</a></span><span class="op">(</span>panel.grid <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_blank</a></span><span class="op">(</span><span class="op">)</span>,
         axis.line <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_line</a></span><span class="op">(</span><span class="op">)</span>,
         axis.ticks <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_line</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></code></pre></div>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<p>The code below extracts the Shenzhen model estimates for test sensitivity and plots them for comparison to our model estimates.</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">shenzhen_sensitivity</span> <span class="op">&lt;-</span> <span class="fu">tibble</span><span class="op">(</span>
   x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html">rep</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html">seq</a></span><span class="op">(</span><span class="op">-</span><span class="fl">8</span>, <span class="fl">7</span>, by <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span>, <span class="va">sims</span><span class="op">)</span>,
   y <span class="op">=</span> <span class="fu">map_dbl</span><span class="op">(</span><span class="va">x</span>, <span class="va">get_shenzhen_estimate</span><span class="op">)</span>
@@ -248,7 +258,8 @@
   <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html">theme</a></span><span class="op">(</span>panel.grid <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_blank</a></span><span class="op">(</span><span class="op">)</span>,
         axis.line <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_line</a></span><span class="op">(</span><span class="op">)</span>,
         axis.ticks <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_line</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></code></pre></div>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<p>The code below takes the output from the optimization function and creates a plot of the time from infection to crossing the critical viral threshold.</p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">exposure_to_threshold</span> <span class="op">&lt;-</span> <span class="fu">tibble</span><span class="op">(</span>
   x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html">rep</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html">seq</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">14</span>, <span class="fl">0.1</span><span class="op">)</span>, <span class="va">sims</span><span class="op">)</span>,
   y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/GammaDist.html">dgamma</a></span><span class="op">(</span><span class="va">x</span>, shape <span class="op">=</span> <span class="va">out</span><span class="op">$</span><span class="va">shape_x</span>, rate <span class="op">=</span> <span class="va">out</span><span class="op">$</span><span class="va">rate_sym</span><span class="op">)</span>
@@ -268,7 +279,8 @@
   <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html">theme</a></span><span class="op">(</span>panel.grid <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_blank</a></span><span class="op">(</span><span class="op">)</span>,
         axis.line <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_line</a></span><span class="op">(</span><span class="op">)</span>,
         axis.ticks <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_line</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></code></pre></div>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<p>The code below takes the output from the optimization function and creates a plot of the time from crossing the critical viral threshold to symptom onset.</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">threshold_to_symtpoms</span> <span class="op">&lt;-</span> <span class="fu">tibble</span><span class="op">(</span>
   x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html">rep</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html">seq</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">14</span>, <span class="fl">0.1</span><span class="op">)</span>, <span class="va">sims</span><span class="op">)</span>,
   y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/GammaDist.html">dgamma</a></span><span class="op">(</span><span class="va">x</span>, shape <span class="op">=</span> <span class="va">out</span><span class="op">$</span><span class="va">shape_y</span>, rate <span class="op">=</span> <span class="va">out</span><span class="op">$</span><span class="va">rate_sym</span><span class="op">)</span>
@@ -288,7 +300,8 @@
   <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html">theme</a></span><span class="op">(</span>panel.grid <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_blank</a></span><span class="op">(</span><span class="op">)</span>,
         axis.line <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_line</a></span><span class="op">(</span><span class="op">)</span>,
         axis.ticks <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_line</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></code></pre></div>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<p>The code below takes the output from the optimization function and calculates the test sensitivity to compare to the Shenzhen data.</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">get_sensitivity_sym</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">t</span>, <span class="va">shape_a</span>, <span class="va">rate_a</span>, <span class="va">shape_y</span>, <span class="va">rate</span><span class="op">)</span> <span class="op">{</span>
   <span class="fu"><a href="https://rdrr.io/r/stats/integrate.html">integrate</a></span><span class="op">(</span><span class="va">estimate_shenzhen</span>, <span class="fl">0</span>, <span class="cn">Inf</span>, t <span class="op">=</span> <span class="va">t</span>, shape_a <span class="op">=</span> <span class="va">shape_a</span>,
             rate_a <span class="op">=</span> <span class="va">rate_a</span>, shape_y <span class="op">=</span> <span class="va">shape_y</span>, rate <span class="op">=</span> <span class="va">rate</span><span class="op">)</span><span class="op">$</span><span class="va">value</span>
@@ -306,7 +319,7 @@
 <span class="op">)</span>
 <span class="va">sensitivity</span> <span class="op">&lt;-</span> <span class="va">params</span> <span class="op">%&gt;%</span>
   <span class="fu">mutate</span><span class="op">(</span>sens <span class="op">=</span> <span class="fu">pmap_dbl</span><span class="op">(</span><span class="va">params</span>, <span class="va">get_sensitivity_sym</span><span class="op">)</span><span class="op">)</span></code></pre></div>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">params</span> <span class="op">&lt;-</span> <span class="fu">tibble</span><span class="op">(</span>
   shape <span class="op">=</span> <span class="va">out</span><span class="op">$</span><span class="va">shape_a</span>,
   rate <span class="op">=</span> <span class="va">out</span><span class="op">$</span><span class="va">rate_a</span>
@@ -323,7 +336,8 @@
             lcl <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/quantile.html">quantile</a></span><span class="op">(</span><span class="va">y</span>, <span class="fl">0.025</span><span class="op">)</span>,
             ucl <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/quantile.html">quantile</a></span><span class="op">(</span><span class="va">y</span>, <span class="fl">0.975</span><span class="op">)</span>,
             .groups <span class="op">=</span> <span class="st">"drop"</span><span class="op">)</span></code></pre></div>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<p>The codebelow takes takes the inferred sensitivity from above and plots it.</p>
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">sensitivity_summ</span> <span class="op">&lt;-</span> <span class="va">sensitivity</span> <span class="op">%&gt;%</span>
   <span class="fu">group_by</span><span class="op">(</span><span class="va">t</span><span class="op">)</span> <span class="op">%&gt;%</span>
   <span class="fu">summarise</span><span class="op">(</span>m <span class="op">=</span> <span class="fl">1</span> <span class="op">-</span> <span class="fu"><a href="https://rdrr.io/r/stats/median.html">median</a></span><span class="op">(</span><span class="va">sens</span><span class="op">)</span>,
@@ -340,7 +354,8 @@
   <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html">theme</a></span><span class="op">(</span>panel.grid <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_blank</a></span><span class="op">(</span><span class="op">)</span>,
         axis.line <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_line</a></span><span class="op">(</span><span class="op">)</span>,
         axis.ticks <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_line</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></code></pre></div>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<p>The code below takes the output from the optimization function and estimates the incubation period.</p>
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">incubation_inferred</span> <span class="op">&lt;-</span> <span class="fu">tibble</span><span class="op">(</span>
   t <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html">rep</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html">seq</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">14</span>, <span class="fl">0.1</span><span class="op">)</span>, <span class="va">sims</span><span class="op">)</span>,
   y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/GammaDist.html">dgamma</a></span><span class="op">(</span><span class="va">t</span>, shape <span class="op">=</span> <span class="va">out</span><span class="op">$</span><span class="va">shape_x</span> <span class="op">+</span> <span class="va">out</span><span class="op">$</span><span class="va">shape_y</span>, rate <span class="op">=</span> <span class="va">out</span><span class="op">$</span><span class="va">rate_sym</span><span class="op">)</span>,
@@ -350,7 +365,8 @@
             lcl <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/quantile.html">quantile</a></span><span class="op">(</span><span class="va">y</span>, <span class="fl">0.025</span><span class="op">)</span>,
             ucl <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/quantile.html">quantile</a></span><span class="op">(</span><span class="va">y</span>, <span class="fl">0.975</span><span class="op">)</span>,
             .groups <span class="op">=</span> <span class="st">"drop"</span><span class="op">)</span></code></pre></div>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<p>The code below combines all figures into a single plot, comparing the empirical estimates to our model estimates.</p>
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://patchwork.data-imaginist.com">patchwork</a></span><span class="op">)</span>
 <span class="va">incubation_plot</span> <span class="op">&lt;-</span> <span class="va">incubation_plot</span> <span class="op">+</span>
   <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html">geom_line</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">incubation_inferred</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html">aes</a></span><span class="op">(</span><span class="va">t</span>, <span class="va">m</span><span class="op">)</span>, color <span class="op">=</span> <span class="st">"cornflower blue"</span>, lty <span class="op">=</span> <span class="fl">2</span><span class="op">)</span> 
@@ -362,10 +378,12 @@
   <span class="fu"><a href="https://patchwork.data-imaginist.com/reference/plot_annotation.html">plot_annotation</a></span><span class="op">(</span>tag_levels <span class="op">=</span> <span class="st">'A'</span><span class="op">)</span></code></pre></div>
 <p><img src="figures_files/figure-html/fig-1-1.png" width="768"></p>
 </div>
-<div id="figure-2" class="section level3">
-<h3 class="hasAnchor">
-<a href="#figure-2" class="anchor"></a>Figure 2</h3>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+</div>
+<div id="figure-2" class="section level2">
+<h2 class="hasAnchor">
+<a href="#figure-2" class="anchor"></a>Figure 2</h2>
+<p>The code below takes the output from the optimization above and estimates the proportion of infections missed.</p>
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">sims</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html">nrow</a></span><span class="op">(</span><span class="va">out</span><span class="op">)</span>
 <span class="fu"><a href="https://rdrr.io/r/base/Random.html">set.seed</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span>
 
@@ -389,7 +407,7 @@
 <span class="va">d</span> <span class="op">&lt;-</span> <span class="va">vals</span> <span class="op">%&gt;%</span>
   <span class="fu">mutate</span><span class="op">(</span>p <span class="op">=</span> <span class="fu">pmap_dbl</span><span class="op">(</span><span class="va">vals</span>, <span class="fu">possibly</span><span class="op">(</span><span class="va">get_prob_missed_infection</span>, otherwise <span class="op">=</span> <span class="cn">NA</span><span class="op">)</span><span class="op">)</span>,
          qt <span class="op">=</span> <span class="va">test_time</span> <span class="op">+</span> <span class="va">additional_quarantine_time</span><span class="op">)</span> </code></pre></div>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">d</span> <span class="op">%&gt;%</span>
   <span class="fu">group_by</span><span class="op">(</span><span class="va">test_time</span>, <span class="va">additional_quarantine_time</span>, <span class="va">qt</span><span class="op">)</span> <span class="op">%&gt;%</span>
   <span class="fu">summarise</span><span class="op">(</span>m_p <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/median.html">median</a></span><span class="op">(</span><span class="va">p</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,
@@ -397,7 +415,8 @@
             lcl_p <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/quantile.html">quantile</a></span><span class="op">(</span><span class="va">p</span>, <span class="fl">0.025</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,
             ucl_p <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/quantile.html">quantile</a></span><span class="op">(</span><span class="va">p</span>, <span class="fl">0.975</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,
             .groups <span class="op">=</span> <span class="st">"drop"</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">d_summ</span></code></pre></div>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<p>The remaining code creates Figure 2.</p>
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">d_summ</span> <span class="op">%&gt;%</span>
   <span class="fu"><a href="https://rdrr.io/r/stats/filter.html">filter</a></span><span class="op">(</span><span class="va">additional_quarantine_time</span> <span class="op">==</span> <span class="fl">0</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">d_test_time</span>
 <span class="va">f2</span> <span class="op">&lt;-</span> <span class="va">d_summ</span> <span class="op">%&gt;%</span>
@@ -424,7 +443,7 @@
         plot.title <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_text</a></span><span class="op">(</span>size <span class="op">=</span> <span class="fl">20</span><span class="op">)</span>,
         legend.title <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_text</a></span><span class="op">(</span>size <span class="op">=</span> <span class="fl">16</span><span class="op">)</span>,
         legend.text <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_text</a></span><span class="op">(</span>size <span class="op">=</span> <span class="fl">16</span><span class="op">)</span><span class="op">)</span></code></pre></div>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">f2_3</span> <span class="op">&lt;-</span> <span class="va">d_summ</span> <span class="op">%&gt;%</span>
   <span class="fu"><a href="https://rdrr.io/r/stats/filter.html">filter</a></span><span class="op">(</span><span class="va">test_time</span> <span class="op">==</span> <span class="fl">3</span><span class="op">)</span> <span class="op">%&gt;%</span>
   <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html">ggplot</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">qt</span>, y <span class="op">=</span> <span class="va">m_p</span>, color <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html">as.factor</a></span><span class="op">(</span><span class="va">test_time</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span>
@@ -442,7 +461,7 @@
   <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html">theme</a></span><span class="op">(</span>panel.grid.minor <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_blank</a></span><span class="op">(</span><span class="op">)</span>,
         legend.position <span class="op">=</span> <span class="st">"none"</span>,
         panel.background <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_rect</a></span><span class="op">(</span>fill <span class="op">=</span> <span class="st">"white"</span>, color <span class="op">=</span> <span class="st">"white"</span><span class="op">)</span><span class="op">)</span></code></pre></div>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">f2_5</span> <span class="op">&lt;-</span> <span class="va">d_summ</span> <span class="op">%&gt;%</span>
   <span class="fu"><a href="https://rdrr.io/r/stats/filter.html">filter</a></span><span class="op">(</span><span class="va">test_time</span> <span class="op">==</span> <span class="fl">5</span><span class="op">)</span> <span class="op">%&gt;%</span>
   <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html">ggplot</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">qt</span>, y <span class="op">=</span> <span class="va">m_p</span>, color <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html">as.factor</a></span><span class="op">(</span><span class="va">test_time</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span>
@@ -460,7 +479,7 @@
   <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html">theme</a></span><span class="op">(</span>panel.grid.minor <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_blank</a></span><span class="op">(</span><span class="op">)</span>,
         legend.position <span class="op">=</span> <span class="st">"bottom"</span>,
         panel.background <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_rect</a></span><span class="op">(</span>fill <span class="op">=</span> <span class="st">"white"</span>, color <span class="op">=</span> <span class="st">"white"</span><span class="op">)</span><span class="op">)</span></code></pre></div>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">f2_7</span> <span class="op">&lt;-</span> <span class="va">d_summ</span> <span class="op">%&gt;%</span>
   <span class="fu"><a href="https://rdrr.io/r/stats/filter.html">filter</a></span><span class="op">(</span><span class="va">test_time</span> <span class="op">==</span> <span class="fl">7</span><span class="op">)</span> <span class="op">%&gt;%</span>
   <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html">ggplot</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">qt</span>, y <span class="op">=</span> <span class="va">m_p</span>, color <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html">as.factor</a></span><span class="op">(</span><span class="va">test_time</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span>
@@ -478,7 +497,7 @@
   <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html">theme</a></span><span class="op">(</span>panel.grid.minor <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_blank</a></span><span class="op">(</span><span class="op">)</span>,
         legend.position <span class="op">=</span> <span class="st">"bottom"</span>,
         panel.background <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_rect</a></span><span class="op">(</span>fill <span class="op">=</span> <span class="st">"white"</span>, color <span class="op">=</span> <span class="st">"white"</span><span class="op">)</span><span class="op">)</span></code></pre></div>
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">f2_10</span> <span class="op">&lt;-</span> <span class="va">d_summ</span> <span class="op">%&gt;%</span>
   <span class="fu"><a href="https://rdrr.io/r/stats/filter.html">filter</a></span><span class="op">(</span><span class="va">test_time</span> <span class="op">==</span> <span class="fl">10</span><span class="op">)</span> <span class="op">%&gt;%</span>
   <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html">ggplot</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">qt</span>, y <span class="op">=</span> <span class="va">m_p</span>, color <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html">as.factor</a></span><span class="op">(</span><span class="va">test_time</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span>
@@ -496,7 +515,7 @@
   <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html">theme</a></span><span class="op">(</span>panel.grid.minor <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_blank</a></span><span class="op">(</span><span class="op">)</span>,
         legend.position <span class="op">=</span> <span class="st">"bottom"</span>,
         panel.background <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_rect</a></span><span class="op">(</span>fill <span class="op">=</span> <span class="st">"white"</span>, color <span class="op">=</span> <span class="st">"white"</span><span class="op">)</span><span class="op">)</span></code></pre></div>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">vals</span> <span class="op">&lt;-</span> <span class="fu">expand_grid</span><span class="op">(</span>
   shape_fnr <span class="op">=</span> <span class="va">out_sum</span><span class="op">$</span><span class="va">shape_a_mean</span>,
   rate_fnr <span class="op">=</span> <span class="va">out_sum</span><span class="op">$</span><span class="va">rate_a_mean</span>,
@@ -511,7 +530,7 @@
 <span class="va">compare_sens</span> <span class="op">&lt;-</span> <span class="va">vals</span> <span class="op">%&gt;%</span>
   <span class="fu">mutate</span><span class="op">(</span>p <span class="op">=</span> <span class="fu">pmap_dbl</span><span class="op">(</span><span class="va">vals</span>, <span class="fu">possibly</span><span class="op">(</span><span class="va">get_prob_missed_infection</span>, otherwise <span class="op">=</span> <span class="cn">NA</span><span class="op">)</span><span class="op">)</span>,
          qt <span class="op">=</span> <span class="va">test_time</span> <span class="op">+</span> <span class="va">additional_quarantine_time</span><span class="op">)</span> </code></pre></div>
-<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">compare_sens</span> <span class="op">%&gt;%</span>
   <span class="fu">group_by</span><span class="op">(</span><span class="va">test_time</span>, <span class="va">additional_quarantine_time</span>, <span class="va">qt</span>, <span class="va">max_sensitivity</span><span class="op">)</span> <span class="op">%&gt;%</span>
   <span class="fu">summarise</span><span class="op">(</span>m_p <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/median.html">median</a></span><span class="op">(</span><span class="va">p</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,
@@ -535,7 +554,7 @@
 ##  9       0.1                     0   0.1            0.5  1.00  1.00  1.00  1.00 
 ## 10       0.1                     0   0.1            0.75 1.00  1.00  1.00  1.00 
 ## # … with 1,118 more rows</code></pre>
-<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">f3</span> <span class="op">&lt;-</span> <span class="va">compare_sens_summ</span> <span class="op">%&gt;%</span>
   <span class="fu"><a href="https://rdrr.io/r/stats/filter.html">filter</a></span><span class="op">(</span><span class="op">(</span><span class="va">additional_quarantine_time</span> <span class="op">==</span> <span class="fl">2</span> <span class="op">&amp;</span> <span class="va">max_sensitivity</span> <span class="op">==</span> <span class="fl">0.99</span><span class="op">)</span> <span class="op">|</span> <span class="op">(</span><span class="va">additional_quarantine_time</span> <span class="op">==</span> <span class="fl">0</span> <span class="op">&amp;</span> <span class="va">max_sensitivity</span> <span class="op">%in%</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">0.5</span>, <span class="fl">0.75</span>, <span class="fl">0.90</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">%&gt;%</span>
   <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html">ggplot</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">qt</span>, y <span class="op">=</span> <span class="va">m_p</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span>
@@ -565,7 +584,7 @@
         plot.title <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_text</a></span><span class="op">(</span>size <span class="op">=</span> <span class="fl">20</span><span class="op">)</span>,
         legend.text <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_text</a></span><span class="op">(</span>size <span class="op">=</span> <span class="fl">16</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span>
   <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/guides.html">guides</a></span><span class="op">(</span>colour <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/guide_legend.html">guide_legend</a></span><span class="op">(</span>nrow <span class="op">=</span> <span class="fl">4</span><span class="op">)</span><span class="op">)</span></code></pre></div>
-<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="op">(</span><span class="va">f2</span> <span class="op">+</span> <span class="fu"><a href="https://patchwork.data-imaginist.com/reference/inset_element.html">inset_element</a></span><span class="op">(</span><span class="va">f2_3</span>, left <span class="op">=</span> <span class="fl">0.6</span>, bottom <span class="op">=</span> <span class="fl">0.75</span>, right <span class="op">=</span> <span class="fl">1</span>, top <span class="op">=</span> <span class="fl">1</span><span class="op">)</span> <span class="op">+</span>
    <span class="fu"><a href="https://patchwork.data-imaginist.com/reference/inset_element.html">inset_element</a></span><span class="op">(</span><span class="va">f2_5</span>, left <span class="op">=</span> <span class="fl">0.6</span>, bottom <span class="op">=</span> <span class="fl">0.55</span>, right <span class="op">=</span> <span class="fl">1</span>, top <span class="op">=</span> <span class="fl">0.8</span><span class="op">)</span> <span class="op">+</span>
    <span class="fu"><a href="https://patchwork.data-imaginist.com/reference/inset_element.html">inset_element</a></span><span class="op">(</span><span class="va">f2_7</span>, left <span class="op">=</span> <span class="fl">0.6</span>, bottom <span class="op">=</span> <span class="fl">0.35</span>, right <span class="op">=</span> <span class="fl">1</span>, top <span class="op">=</span> <span class="fl">0.6</span><span class="op">)</span> <span class="op">+</span>
@@ -577,7 +596,9 @@
 
   <div class="col-md-3 hidden-xs hidden-sm" id="pkgdown-sidebar">
 
-      </div>
+        <nav id="toc" data-toggle="toc"><h2 data-toc-skip>Contents</h2>
+    </nav>
+</div>
 
 </div>
 

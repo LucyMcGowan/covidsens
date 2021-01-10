@@ -3,7 +3,7 @@ title: Run Optimization and Create Paper Figures
 output: html_document
 ---
 
-### Optimization
+## Load packages
 
 ```{r, message = FALSE, warning = FALSE}
 library(tidyverse)
@@ -11,18 +11,32 @@ library(dfoptim)
 library(covidsens)
 ```
 
-```{r opt_fx}
+## Optimization
+
+The `estimate_shenzhen` function estimates the sensitivity at a given time from crossing a critical viral load threshold, `k`, and time from symptom onset, `t`. It will be used to approximate the Shenzhen test sensitivity data.
+
+```{r}
 estimate_shenzhen <- function(k, t, shape_y, shape_a, rate_a, rate) {
   dgamma(k, shape_y, rate) * 
     get_fnr(time = k + t, shape = shape_a, rate = rate_a)
 }
+```
 
+The `diff_shenzhen` function integrates over `estimate_shenzhen` from 0 to $\infty$ with respect to `k`, the time from crossing the critical viral threshold for a given time from symptom onset, `t`. It then subtracts this estimate from the test sensitivity indexed at symptom onset reported by the Shenzhen model.
+
+```{r}
 diff_shenzhen <- function(t, shape_a, rate_a, shape_y, rate) {
   integrate(estimate_shenzhen, 0, Inf, t = t, shape_a = shape_a,
             rate_a = rate_a, shape_y = shape_y, rate = rate)$value - 
     get_shenzhen_estimate(t) 
 }
 
+```
+
+
+The `er` function is the function that is minimized by the optimization function. It includes the squared difference between the model sensitivity estimates and the Shenzhen estimates from 8 days prior to symptom onset through 7 days post-symptom onset, as well as the squared difference between the estimated shape of the infectiousness gamma distribution and the shape derived from the empirical data put forth by the MacAloon meta analysis. This function is attempting to simultaneously find optimal estimates for the shape and rate of a gamma distribution used to estimate the test sensitivity indexed on time of crossing the critical viral threshold (`shape_a` and `rate_a`), as well as the shape of the distribution of time from infection to crossing the critical viral threshold (`shape_x`) and the shape of the distribution of time from crossing the critical viral threshold to symptom onset (`shape_y`).
+
+```{r}
 er <- function(x, shape, rate) {
   shape_a <- x[1]
   rate_a <- x[2]
@@ -32,7 +46,11 @@ er <- function(x, shape, rate) {
               rate_a = rate_a, shape_y = shape_y, rate = rate)^2) +
     ((shape_y + shape_x) - shape)^2
 }
+```
 
+The `run_optimization` function first finds a gamma distribution that best fits the log normal distribution proposed by McAloon et al. It then uses the shape and rate of this distribution in the optimization function, minimizing the `er` function described above. The `nmkb` function is an implementation of the Nelder-Mead algorithm for derivative-free optimization that allows bounds to be placed on parameters. Finally, a data frame with results is output. 
+
+```{r}
 run_optimization <- function() {
   fit_incubation <- fitdistrplus::fitdist(
     rlnorm(10000, rnorm(1, 1.63, 0.06122), rnorm(1, 0.5, 0.0255102)), "gamma")
@@ -67,6 +85,8 @@ run_optimization <- possibly(run_optimization,
                              ))
 ```
 
+The code below runs the `run_optimization` function 5,000 times, saving the output to a large data frame called `out`.
+
 ```{r opt_run, cache = TRUE}
 sims <- 5000
 
@@ -77,6 +97,7 @@ out <- map_df(1:sims, ~run_optimization())
 ```{r, echo = FALSE, eval = FALSE}
 save(out, file = "data-raw/param-est.Rda")
 ```
+
 
 ```{r summarize}
 out %>%
@@ -95,7 +116,9 @@ out %>%
 knitr::kable(out_sum)
 ```
 
-### Figure 1
+### Figure S1
+
+The code below takes the incubation distribution results from McAloon et al. and plots them to compare our model estimates of the incubation period to. 
 
 ```{r}
 incubation <- tibble(
@@ -118,6 +141,8 @@ incubation_plot <- incubation %>%
         axis.line = element_line(),
         axis.ticks = element_line())
 ```
+
+The code below extracts the Shenzhen model estimates for test sensitivity and plots them for comparison to our model estimates.
 
 ```{r shen-sens, cache = TRUE}
 shenzhen_sensitivity <- tibble(
@@ -142,6 +167,8 @@ shenzhen_sensitivity_p <-
         axis.ticks = element_line())
 ```
 
+The code below takes the output from the optimization function and creates a plot of the time from infection to crossing the critical viral threshold.
+
 ```{r detect}
 exposure_to_threshold <- tibble(
   x = rep(seq(0, 14, 0.1), sims),
@@ -164,6 +191,9 @@ exposure_to_threshold <- tibble(
         axis.ticks = element_line())
 ```
 
+
+The code below takes the output from the optimization function and creates a plot of the time from crossing the critical viral threshold to symptom onset.
+
 ```{r thresh-sym}
 threshold_to_symtpoms <- tibble(
   x = rep(seq(0, 14, 0.1), sims),
@@ -185,6 +215,8 @@ threshold_to_symtpoms <- tibble(
         axis.line = element_line(),
         axis.ticks = element_line())
 ```
+
+The code below takes the output from the optimization function and calculates the test sensitivity to compare to the Shenzhen data.
 
 ```{r sens-infer, cache = TRUE}
 get_sensitivity_sym <- function(t, shape_a, rate_a, shape_y, rate) {
@@ -226,6 +258,8 @@ sens <- params %>%
 ```
 
 
+The codebelow takes takes the inferred sensitivity from above and plots it.
+
 ```{r sens-infer-plot}
 sensitivity_summ <- sensitivity %>%
   group_by(t) %>%
@@ -245,6 +279,8 @@ inferred_sensitivity <- sens %>%
         axis.ticks = element_line())
 ```
 
+The code below takes the output from the optimization function and estimates the incubation period.
+
 ```{r overlay-1}
 incubation_inferred <- tibble(
   t = rep(seq(0, 14, 0.1), sims),
@@ -257,6 +293,7 @@ incubation_inferred <- tibble(
             .groups = "drop")
 ```
 
+The code below combines all figures into a single plot, comparing the empirical estimates to our model estimates.
 
 ```{r fig-1, fig.height = 6, fig.width = 8}
 library(patchwork)
@@ -281,7 +318,9 @@ ggsave("man/figures/fig1-e.pdf", plot = inferred_sensitivity, width = 7.5, heigh
 ```
 
 
-### Figure 2
+## Figure 2
+
+The code below takes the output from the optimization above and estimates the proportion of infections missed. 
 
 ```{r stochastic-prob-missed, cache = TRUE}
 sims <- nrow(out)
@@ -323,6 +362,7 @@ d %>%
             .groups = "drop") -> d_summ
 ```
 
+The remaining code creates Figure 2.
 
 ```{r f2, message = FALSE, warning = FALSE}
 d_summ %>%
