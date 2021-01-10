@@ -3,3 +3,9 @@
 ^README\.Rmd$
 ^LICENSE\.md$
 ^README_cache$
+^_pkgdown\.yml$
+^index\.Rmd$
+^\.github$
+^pkgdown$
+^vignettes/articles$
+^docs$

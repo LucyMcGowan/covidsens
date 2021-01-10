@@ -1,13 +1,15 @@
 Package: covidsens
-Title: What the Package Does (One Line, Title Case)
+Title: Estimates test sensitivity for COVID-19 diagnostic tests
 Version: 0.0.0.9000
 Authors@R: 
-    person(given = "First",
-           family = "Last",
+    person(given = "Lucy",
+           family = "D'Agostino McGowan",
            role = c("aut", "cre"),
-           email = "first.last@example.com",
+           email = "lucydagostino@gmail.com",
            comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
+Description: Estimate test sensitivity for COVID-19 diagnostic tests as well as 
+    the probability of an infected individual going undetected given a particular
+    test date and quarantine duration.
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
