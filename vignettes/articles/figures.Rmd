@@ -176,8 +176,8 @@ exposure_to_threshold <- tibble(
 ) %>%
   group_by(x) %>%
   summarise(m = median(y),
-            lcl = quantile(y, 0.025),
-            ucl = quantile(y, 0.975),
+            lcl = quantile(y, 0.025, na.rm = TRUE),
+            ucl = quantile(y, 0.975, na.rm = TRUE),
             .groups = "drop") %>%
   ggplot(aes(x, m)) +
   geom_line(color = "cornflower blue") +
