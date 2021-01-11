@@ -34,7 +34,7 @@ diff_shenzhen <- function(t, shape_a, rate_a, shape_y, rate) {
 ```
 
 
-The `er` function is the function that is minimized by the optimization function. It includes the squared difference between the model sensitivity estimates and the Shenzhen estimates from 8 days prior to symptom onset through 7 days post-symptom onset, as well as the squared difference between the estimated shape of the infectiousness gamma distribution and the shape derived from the empirical data put forth by the MacAloon meta analysis. This function is attempting to simultaneously find optimal estimates for the shape and rate of a gamma distribution used to estimate the test sensitivity indexed on time of crossing the critical viral threshold (`shape_a` and `rate_a`), as well as the shape of the distribution of time from infection to crossing the critical viral threshold (`shape_x`) and the shape of the distribution of time from crossing the critical viral threshold to symptom onset (`shape_y`).
+The `er` function is the function that is minimized by the optimization function. It includes the squared difference between the model sensitivity estimates and the Shenzhen estimates from 8 days prior to symptom onset through 7 days post-symptom onset, as well as the squared difference between the estimated shape of the infectiousness gamma distribution and the shape derived from the empirical data put forth by the McAloon et al. meta analysis. This function is attempting to simultaneously find optimal estimates for the shape and rate of a gamma distribution used to estimate the test sensitivity indexed on time of crossing the critical viral threshold (`shape_a` and `rate_a`), as well as the shape of the distribution of time from infection to crossing the critical viral threshold (`shape_x`) and the shape of the distribution of time from crossing the critical viral threshold to symptom onset (`shape_y`).
 
 ```{r}
 er <- function(x, shape, rate) {
@@ -258,7 +258,7 @@ sens <- params %>%
 ```
 
 
-The codebelow takes takes the inferred sensitivity from above and plots it.
+The code below takes takes the inferred sensitivity from above and plots it.
 
 ```{r sens-infer-plot}
 sensitivity_summ <- sensitivity %>%
